@@ -1,0 +1,20 @@
+#ifndef COLOR_H
+#define COLOR_H
+
+#define COLOR_BASE_ESC "\x1b" // \x for HEX and 1b == dec(27) is ESC in ascii
+#define COLOR_RESET COLOR_BASE_ESC "[0m"
+
+#define COLOR_RED COLOR_BASE_ESC "[31m"
+#define COLOR_GREEN COLOR_BASE_ESC "[32m"
+#define COLOR_YELLOW COLOR_BASE_ESC "[33m"
+#define COLOR_BLUE COLOR_BASE_ESC "[34m"
+#define COLOR_PURPLE COLOR_BASE_ESC "[35m"
+#define COLOR_CYAN COLOR_BASE_ESC "[36m"
+#define COLOR_WHITE COLOR_BASE_ESC "[37m"
+
+#define COLOR_BOLD COLOR_BASE_ESC "[2m"
+#define COLOR_UNDERLINE COLOR_BASE_ESC "[4m"
+#define COLOR_BLINK COLOR_BASE_ESC "[5m"
+#define COLOR_ITALIC COLOR_BASE_ESC "[3m"
+
+#endif // COLOR_H
