@@ -1,4 +1,10 @@
+#include <ctype.h>
+
+
 #include "lapasa.h"
+
+
+#include "log.h"
 #include "colors.h"
 
 int lapasa_test()
@@ -7,7 +13,7 @@ int lapasa_test()
  */
 {
 	struct Tokens tokens;
-	char test_json[] = "{ forty:  40       , fifty:50	   , 45: { 34 : 45 }}";
+	char test_json[] = "{ \"forty two\"hundred:  \"42\"       ,\n fifty:50	   , \n 45: { 34 : 45 }}";
 	log_info(" Doing " COLOR_ITALIC "lapasa's" COLOR_RESET " tests" );
 	log_info(" Testing tokenizer" );
 
@@ -16,7 +22,7 @@ int lapasa_test()
 	for ( int i = 0; i < tokens.length; i++ )
 	{
 		struct Kvpair pair = lapasa_splits( tokens.tokens[i] );
-		printf( "%s is %s\n", pair.key, pair.value.string);
+		printf( "%s -> %s\n", pair.key, pair.value.string);
 	}
 
 	free( tokens.tokens );
@@ -92,86 +98,151 @@ struct Tokens atokenize( char * obj )
 	return (struct Tokens) { .tokens = table, .length = array_len };
 };
 
-struct Kvpair lapasa_splits( char * str )
+char * splits( char * str, char seperator )
 {
-	char * key;
-	char * val;
-	union lapasa_json_object obj;
-	enum lapasa_type type;
-	int in_key = 0;
-	int in_val = 0;
+	int i;
+	for ( i = 0; str[i] != '\0'; i++ )
+	{
+		if ( str[i] == seperator )
+		{
+			str[i] = '\0';
+			return &(str[i+1]);
+		}
+	}
+	return NULL;
+}
 
-	int seen_key = 0;
-	int seen_val = 0;
+char * shaves( char * str )
+{
+	bool seen_word = false;
+	bool in_word = false;
+	bool encountered_double_quotes = false;
+
+	int bracket_depth = 0;
+
+	enum lapasa_type type;
+
+	char * return_value;
 
 	for ( int i = 0; str[i] != '\0'; i++ )
 	{
-		switch ( str[i] )
+		if ( !(seen_word) && !(in_word) )
 		{
-			case ':':
+			if (isspace( str[i] ))
+			/*
+			 * Blank before word
+			 */
+				continue;
+			else
+			/*
+			 * First char
+			 */
+			{
+				if (isdigit( str[i] ))
+				{
+					type = LAPASA_INT;
+				}
+				switch ( str[i] )
+				{
+					case '"':
+						if (encountered_double_quotes == false)
+						{
+							encountered_double_quotes = true;
+							type = LAPASA_STRING;
+						}
+						break;
+					case '{':
+						type = LAPASA_JSON;
+						bracket_depth++;
+						break;
+				}
+				return_value = &(str[i]);
+				in_word = true;
+			}
+		}
+		else if (!(seen_word) && (in_word))
+		{
+			if (isspace( str[i] ))
+			/*
+			 * First space after word
+			 */
+			{
+				if (( encountered_double_quotes == 0 ) && (bracket_depth == 0))
+				{
+					in_word = false;
+					seen_word = true;
+				}
+			}
+			else
+			/*
+			 * All chars within the word
+			 */
+			{
+				if ( type == LAPASA_INT )
+					if ( str[i] == '.' )
+						type = LAPASA_FLOAT;
+
+				switch ( str[i] )
+				{
+
+					case '"':
+						if (encountered_double_quotes == true)
+						{
+							encountered_double_quotes = false;
+							seen_word = true;
+							str[i + 1] = '\0';
+						}
+						else if (encountered_double_quotes == false)
+							log_sl( "What is this even supposed to mean??" );
+						break;
+					case '{':
+						bracket_depth++;
+						break;
+					case '}':
+						bracket_depth--;
+						break;
+				}
+			}
+		}
+		else if ( (seen_word) )
+		/* 
+		 * Seen word and now exiting
+		 */
+		{
+			if ( isspace( str[i] ) )
+			{
 				str[i] = '\0';
 				break;
-			case ' ':
-				str[i] = '\0';
+			}
 
-				if (!(seen_key) && !(seen_val))
-				{
-					if (!(in_key))
-					/*
-					 * Before key
-					 */
-					{
-						break;
-					}
-
-					if (in_key == 1)
-					/*
-					 * First space between key and val
-					 */
-					{
-						in_key = 0;
-						seen_key = 1;
-					}
-				}
-				
-					
-				if ((seen_key) && !(seen_val))
-				{
-					if (!(in_val))
-					/*
-					 * Between key and val
-					 */
-					{
-						break;
-					}
-
-					if (in_val)
-					/* 
-					 * First space after val
-					 */
-
-					{
-						in_val = 0;
-					}
-				}
-
-			default:
-
-				if (!(in_key) && !(in_val))
-				{
-					if (!(seen_key))
-					{
-						key = &(str[i]);
-						in_key = 1;
-					}
-					if (seen_key)
-					{
-						val = &(str[i]);
-						in_val = 1;
-					}
-				}
 		}
 	}
+	return return_value;
+}
+
+struct Kvpair lapasa_splits( char * str )
+{
+	const char seperator = ':';
+	char * key;
+	char * val;
+
+	union lapasa_json_object obj;
+	enum lapasa_type type;
+
+	key = &(str[0]);
+	val = splits( str, seperator );
+
+	log_sl( "Split key: %s", key );
+	log_sl( "Split value: %s", val );
+
+	key = shaves( key );
+	val = shaves( val );
+
+	log_sl( "Shaved key: %s", key );
+	log_sl( "Shaved value: %s", val );
+
+
+	
 	obj.string = val;
 	type = LAPASA_STRING;
 	return (struct Kvpair) { .key = key, .value = obj, .value_type = type };
